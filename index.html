@@ -168,11 +168,41 @@
   <footer class="relative z-10 py-4"></footer>
 
   <script>
-    // --- SECURE HASH VERIFICATION MODULE (Tanpa file pwd.txt terpisah) ---
-    // Password default saat ini adalah: jembatan2026
-    const TARGET_HASH = "f2095f3ff808ebba2dd4ed7aaed240b64d1f2719ec20f18bdce66d2f34731a54";
+    // --- SECURE HASH VERIFICATION MODULE ---
+    // Load password from password.txt and compute hash
+    let TARGET_HASH = null;
+    let passwordLoaded = false;
+
+    // Fetch password from password.txt
+    async function loadPasswordHash() {
+      try {
+        const response = await fetch('password.txt');
+        const passwordText = await response.text();
+        const password = passwordText.trim();
+        
+        // Compute SHA-256 hash of the password
+        const encoder = new TextEncoder();
+        const data = encoder.encode(password);
+        const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        TARGET_HASH = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        
+        passwordLoaded = true;
+        console.log("Password loaded and hashed successfully");
+      } catch (err) {
+        console.error("Failed to load password:", err);
+        // Fallback to default hash if loading fails
+        TARGET_HASH = "f2095f3ff808ebba2dd4ed7aaed240b64d1f2719ec20f18bdce66d2f34731a54";
+        passwordLoaded = true;
+      }
+    }
 
     async function verifyPassword(password) {
+      // Ensure password is loaded before verifying
+      if (!passwordLoaded) {
+        await loadPasswordHash();
+      }
+      
       try {
         const encoder = new TextEncoder();
         const data = encoder.encode(password);
@@ -187,6 +217,9 @@
         return false;
       }
     }
+
+    // Load password on page load
+    loadPasswordHash();
 
     // --- UI & Auth Flow ---
     const authGate = document.getElementById('authGate');
