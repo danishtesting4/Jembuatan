@@ -42,7 +42,7 @@
     <div class="w-full max-w-md neon-border bg-black/80 backdrop-blur-xl rounded-2xl p-8 text-center space-y-6">
       <div>
         <h1 class="font-orbitron font-black text-2xl text-white tracking-widest">TIM JEMBATAN</h1>
-        <p class="text-xs text-gray-400 mt-1">Pilih profil dan masukkan kunci akses</p>
+        <p class="text-xs text-gray-400 mt-1">Pilih profil dan masukkan password</p>
       </div>
 
       <form id="loginForm" class="space-y-4 text-left">
@@ -59,7 +59,7 @@
         </div>
 
         <div>
-          <label class="text-xs font-mono text-gray-400 block mb-1">Kunci Akses</label>
+          <label class="text-xs font-mono text-gray-400 block mb-1">Password</label>
           <input 
             type="password" 
             id="passcodeInput" 
@@ -69,7 +69,7 @@
             autocomplete="current-password"
           />
         </div>
-        <p id="errorMsg" class="text-xs text-red-500 font-mono hidden text-center">Pilih nama atau kunci akses salah.</p>
+        <p id="errorMsg" class="text-xs text-red-500 font-mono hidden text-center">Pilih nama atau password salah.</p>
         <button 
           type="submit" 
           class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-xl transition shadow-[0_0_20px_rgba(255,0,51,0.4)] tracking-wider text-sm mt-2">
@@ -168,38 +168,23 @@
   <footer class="relative z-10 py-4"></footer>
 
   <script>
-    // --- PRIVATE SYSTEM CIPHER MODULE ---
-    const SystemVault = (() => {
-      const INTERNAL_SALT = "TJ_2026_CORE_SYSTEM";
+    // --- SECURE HASH VERIFICATION MODULE (Tanpa file pwd.txt terpisah) ---
+    // Password default saat ini adalah: jembatan2026
+    const TARGET_HASH = "f2095f3ff808ebba2dd4ed7aaed240b64d1f2719ec20f18bdce66d2f34731a54";
 
-      function computeToken(inputStr) {
-        const salted = INTERNAL_SALT + "::" + inputStr + "::" + INTERNAL_SALT.split("").reverse().join("");
-        let encoded = "";
-        for (let i = 0; i < salted.length; i++) {
-          let charCode = salted.charCodeAt(i);
-          let transformed = (charCode * 7 + (i + 13)) % 256;
-          encoded += transformed.toString(16).padStart(2, '0');
-        }
-        const chunk1 = encoded.slice(0, Math.floor(encoded.length / 2));
-        const chunk2 = encoded.slice(Math.floor(encoded.length / 2));
-        return btoa(chunk2 + "_" + chunk1);
+    async function verifyPassword(password) {
+      try {
+        const encoder = new TextEncoder();
+        const data = encoder.encode(password);
+        const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        const hashedInput = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        return hashedInput === TARGET_HASH;
+      } catch (err) {
+        console.error("Auth error:", err);
+        return false;
       }
-
-      return {
-        verify: async (userPassword) => {
-          try {
-            const response = await fetch('pwd.txt');
-            if (!response.ok) throw new Error("Vault file missing");
-            const expectedToken = (await response.text()).trim();
-            const generatedToken = computeToken(userPassword);
-            return generatedToken === expectedToken;
-          } catch (err) {
-            console.error("Verification error:", err);
-            return false;
-          }
-        }
-      };
-    })();
+    }
 
     // --- UI & Auth Flow ---
     const authGate = document.getElementById('authGate');
@@ -221,7 +206,7 @@
     loginForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       const selectedMember = memberSelect.value;
-      const isValid = await SystemVault.verify(passInput.value);
+      const isValid = await verifyPassword(passInput.value);
 
       if (isValid && selectedMember) {
         activeUser = selectedMember;
@@ -268,6 +253,7 @@
       const todayStr = new Date().toISOString().split('T')[0];
       let records = JSON.parse(localStorage.getItem('tj_attendance_records') || '{}');
 
+      // Auto Clock-Out jika tanggal berubah
       if (records.date && records.date !== todayStr) {
         records = { date: todayStr, list: {} };
         localStorage.setItem('tj_attendance_records', JSON.stringify(records));
@@ -398,7 +384,6 @@
         const msgs = JSON.parse(localStorage.getItem('tj_chat_messages') || '[]');
         msgs.push({ user: username, text: text, time: timeStr });
         
-        // Simpan maksimal 50 pesan terakhir
         if (msgs.length > 50) msgs.shift();
 
         localStorage.setItem('tj_chat_messages', JSON.stringify(msgs));
@@ -406,7 +391,6 @@
         loadMessages();
       });
 
-      // Sinkronisasi real-time jika ada perubahan dari tab/perangkat lokal lain
       window.addEventListener('storage', (e) => {
         if (e.key === 'tj_chat_messages' || e.key === 'tj_attendance_records') {
           loadMessages();
@@ -446,4 +430,24 @@
         const grad = ctx.createLinearGradient(line.x, line.y, line.x + line.length, line.y);
         grad.addColorStop(0, 'rgba(255, 0, 51, 0)');
         grad.addColorStop(0.5, `rgba(255, 0, 51, ${line.opacity})`);
-       
+        grad.addColorStop(1, 'rgba(255, 0, 51, 0)');
+
+        ctx.beginPath();
+        ctx.strokeStyle = grad;
+        ctx.lineWidth = Math.random() * 1.5 + 0.5;
+        ctx.moveTo(line.x, line.y);
+        ctx.lineTo(line.x + line.length, line.y);
+        ctx.stroke();
+      });
+      requestAnimationFrame(animateWind);
+    }
+    animateWind();
+
+    // --- Voxel Bridge Rendering ---
+    function initBridgeCanvas() {
+      const bCanvas = document.getElementById('bridgeCanvas');
+      if (!bCanvas) return;
+      const bCtx = bCanvas.getContext('2d');
+      const BLOCK_SIZE = 16;
+      
+      bCt
