@@ -1,243 +1,234 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Migrasi untuk Tim Jembatan</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;800;900&display=swap');
-
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #030305;
-            color: #ffffff;
-            overflow: hidden;
-            margin: 0;
-            padding: 0;
-        }
-
-        /* Red glow for Tim Jembatan text */
-        .glow-red {
-            color: #ff2a2a;
-            text-shadow: 0 0 20px rgba(255, 42, 42, 0.9),
-                         0 0 45px rgba(255, 42, 42, 0.6),
-                         0 0 80px rgba(220, 0, 0, 0.4);
-        }
-
-        .gentle-float {
-            animation: float 4s ease-in-out infinite alternate;
-        }
-
-        @keyframes float {
-            0% { transform: translateY(0px); }
-            100% { transform: translateY(-8px); }
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tim Jembatan Portal</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+  <style>
+    body { background-color: #030305; color: #f3f4f6; overflow-x: hidden; font-family: 'Plus Jakarta Sans', sans-serif; }
+    .font-orbitron { font-family: 'Orbitron', sans-serif; }
+    .neon-border { box-shadow: 0 0 15px rgba(255, 0, 51, 0.25), inset 0 0 15px rgba(255, 0, 51, 0.1); border: 1px solid rgba(255, 0, 51, 0.4); }
+    .neon-text { text-shadow: 0 0 20px rgba(255, 0, 51, 0.8), 0 0 40px rgba(255, 0, 51, 0.4); }
+  </style>
 </head>
-<body class="bg-black text-white h-screen w-screen relative flex items-center justify-center select-none overflow-hidden">
+<body class="min-h-screen flex flex-col justify-between relative selection:bg-red-600 selection:text-white">
 
-    <canvas id="windCanvas" class="absolute inset-0 w-full h-full z-0 pointer-events-none"></canvas>
+  <!-- Background Wind Animation Canvas -->
+  <canvas id="windCanvas" class="fixed inset-0 pointer-events-none z-0"></canvas>
 
-    <div class="z-10 flex flex-col items-center justify-center px-6 text-center gentle-float w-full max-w-6xl mx-auto">
-        
-        <!-- Balanced, highly readable heading -->
-        <h1 class="text-4xl sm:text-6xl md:text-7xl lg:text-8xl font-black tracking-tight leading-tight mb-2">
-            Migrasi untuk <span class="glow-red inline-block">Tim Jembatan</span>
-        </h1>
-
-        <!-- Compact Block Bridge directly underneath -->
-        <div class="w-full flex justify-center items-center mt-2">
-            <canvas id="bridgeCanvas" class="w-full max-w-[900px] h-auto drop-shadow-[0_10px_30px_rgba(255,42,42,0.4)]"></canvas>
-        </div>
-
+  <!-- Navigation Bar -->
+  <header class="relative z-10 border-b border-white/10 bg-black/60 backdrop-blur-md px-6 py-4 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <div class="w-3 h-3 rounded-full bg-red-600 animate-pulse shadow-[0_0_10px_#ff0033]"></div>
+      <span class="font-orbitron font-bold tracking-wider text-xl text-white">TIM JEMBATAN</span>
     </div>
+    <div class="hidden"></div>
+  </header>
 
-    <script>
-        const windCanvas = document.getElementById('windCanvas');
-        const wCtx = windCanvas.getContext('2d');
+  <!-- Login Gate Screen -->
+  <div id="authGate" class="relative z-20 flex-1 flex items-center justify-center p-4">
+    <div class="w-full max-w-md neon-border bg-black/80 backdrop-blur-xl rounded-2xl p-8 text-center space-y-6">
+      <div>
+        <h1 class="font-orbitron font-black text-2xl text-white tracking-widest">TIM JEMBATAN</h1>
+      </div>
 
-        let wWidth, wHeight;
+      <form id="loginForm" class="space-y-4">
+        <div>
+          <input 
+            type="password" 
+            id="passcodeInput" 
+            placeholder="Masukkan Kunci Akses..." 
+            class="w-full bg-black/80 border border-white/20 rounded-xl px-4 py-3 text-center text-white font-mono placeholder:text-gray-600 focus:outline-none focus:border-red-600 transition"
+            required
+            autocomplete="current-password"
+          />
+        </div>
+        <p id="errorMsg" class="text-xs text-red-500 font-mono hidden">Kunci akses tidak valid.</p>
+        <button 
+          type="submit" 
+          class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-xl transition shadow-[0_0_20px_rgba(255,0,51,0.4)] tracking-wider">
+          Login
+        </button>
+      </form>
+    </div>
+  </div>
 
-        function resizeWind() {
-            wWidth = windCanvas.width = window.innerWidth;
-            wHeight = windCanvas.height = window.innerHeight;
+  <!-- Main Authenticated Content -->
+  <main id="mainContent" class="hidden relative z-10 flex-1 flex flex-col items-center justify-center px-4 py-12 text-center">
+    <div class="max-w-5xl mx-auto flex flex-col items-center">
+      <h1 class="font-orbitron font-black text-5xl md:text-7xl lg:text-8xl tracking-tight text-white neon-text mb-6">
+        TIM JEMBATAN
+      </h1>
+      <div class="w-full max-w-[900px] overflow-hidden my-4 flex justify-center">
+        <canvas id="bridgeCanvas" width="1200" height="320" class="w-full h-auto max-h-[300px]"></canvas>
+      </div>
+      <div class="mt-8 flex gap-4">
+        <button id="btnLogout" class="bg-white/10 hover:bg-white/20 border border-white/20 text-xs font-mono text-gray-300 py-2.5 px-6 rounded-xl transition">
+          LOG OUT
+        </button>
+      </div>
+    </div>
+  </main>
+
+  <footer class="relative z-10 py-4"></footer>
+
+  <script>
+    // --- PRIVATE SYSTEM CIPHER MODULE ---
+    const SystemVault = (() => {
+      const INTERNAL_SALT = "TJ_2026_CORE_SYSTEM";
+
+      function computeToken(inputStr) {
+        const salted = INTERNAL_SALT + "::" + inputStr + "::" + INTERNAL_SALT.split("").reverse().join("");
+        let encoded = "";
+        for (let i = 0; i < salted.length; i++) {
+          let charCode = salted.charCodeAt(i);
+          let transformed = (charCode * 7 + (i + 13)) % 256;
+          encoded += transformed.toString(16).padStart(2, '0');
         }
-        window.addEventListener('resize', resizeWind);
-        resizeWind();
+        const chunk1 = encoded.slice(0, Math.floor(encoded.length / 2));
+        const chunk2 = encoded.slice(Math.floor(encoded.length / 2));
+        return btoa(chunk2 + "_" + chunk1);
+      }
 
-        class WindParticle {
-            constructor() {
-                this.reset(true);
-            }
-
-            reset(initial = false) {
-                this.x = initial ? Math.random() * wWidth : -200 - Math.random() * 300;
-                this.y = Math.random() * wHeight;
-                this.length = Math.random() * 220 + 100;
-                this.speed = Math.random() * 8 + 5;
-                this.opacity = Math.random() * 0.45 + 0.15;
-                this.thickness = Math.random() * 3 + 1;
-                this.isRed = Math.random() < 0.35;
-            }
-
-            update() {
-                this.x += this.speed;
-                if (this.x - this.length > wWidth) {
-                    this.reset();
-                }
-            }
-
-            draw() {
-                wCtx.beginPath();
-                const grad = wCtx.createLinearGradient(this.x - this.length, this.y, this.x, this.y);
-                
-                if (this.isRed) {
-                    grad.addColorStop(0, 'rgba(255, 42, 42, 0)');
-                    grad.addColorStop(0.8, `rgba(255, 42, 42, ${this.opacity})`);
-                    grad.addColorStop(1, 'rgba(255, 120, 120, 0)');
-                } else {
-                    grad.addColorStop(0, 'rgba(255, 255, 255, 0)');
-                    grad.addColorStop(0.8, `rgba(220, 225, 255, ${this.opacity * 0.6})`);
-                    grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
-                }
-
-                wCtx.strokeStyle = grad;
-                wCtx.lineWidth = this.thickness;
-                wCtx.lineCap = 'round';
-                wCtx.moveTo(this.x - this.length, this.y);
-                wCtx.lineTo(this.x, this.y);
-                wCtx.stroke();
-            }
+      return {
+        verify: async (userPassword) => {
+          try {
+            const response = await fetch('pwd.txt');
+            if (!response.ok) throw new Error("Vault file missing");
+            const expectedToken = (await response.text()).trim();
+            const generatedToken = computeToken(userPassword);
+            return generatedToken === expectedToken;
+          } catch (err) {
+            console.error("Verification error:", err);
+            return false;
+          }
         }
+      };
+    })();
 
-        const windParticles = Array.from({ length: 70 }, () => new WindParticle());
+    // --- UI & Auth Flow ---
+    const authGate = document.getElementById('authGate');
+    const mainContent = document.getElementById('mainContent');
+    const loginForm = document.getElementById('loginForm');
+    const passInput = document.getElementById('passcodeInput');
+    const errorMsg = document.getElementById('errorMsg');
+    const btnLogout = document.getElementById('btnLogout');
 
-        function animateWind() {
-            wCtx.clearRect(0, 0, wWidth, wHeight);
-            windParticles.forEach(p => {
-                p.update();
-                p.draw();
-            });
-            requestAnimationFrame(animateWind);
+    if (sessionStorage.getItem('tj_secure_auth') === 'true') {
+      unlockPortal();
+    }
+
+    loginForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const isValid = await SystemVault.verify(passInput.value);
+      if (isValid) {
+        sessionStorage.setItem('tj_secure_auth', 'true');
+        unlockPortal();
+      } else {
+        errorMsg.classList.remove('hidden');
+        passInput.value = '';
+      }
+    });
+
+    btnLogout.addEventListener('click', () => {
+      sessionStorage.removeItem('tj_secure_auth');
+      location.reload();
+    });
+
+    function unlockPortal() {
+      authGate.classList.add('hidden');
+      mainContent.classList.remove('hidden');
+      initBridgeCanvas();
+    }
+
+    // --- Wind Background Animation ---
+    const canvas = document.getElementById('windCanvas');
+    const ctx = canvas.getContext('2d');
+    let width = canvas.width = window.innerWidth;
+    let height = canvas.height = window.innerHeight;
+
+    window.addEventListener('resize', () => {
+      width = canvas.width = window.innerWidth;
+      height = canvas.height = window.innerHeight;
+    });
+
+    const lines = Array.from({ length: 70 }, () => ({
+      x: Math.random() * width,
+      y: Math.random() * height,
+      length: Math.random() * 90 + 40,
+      speed: Math.random() * 3.5 + 2,
+      opacity: Math.random() * 0.4 + 0.1
+    }));
+
+    function animateWind() {
+      ctx.clearRect(0, 0, width, height);
+      lines.forEach(line => {
+        line.x += line.speed;
+        if (line.x > width) {
+          line.x = -line.length;
+          line.y = Math.random() * height;
         }
+        const grad = ctx.createLinearGradient(line.x, line.y, line.x + line.length, line.y);
+        grad.addColorStop(0, 'rgba(255, 0, 51, 0)');
+        grad.addColorStop(0.5, `rgba(255, 0, 51, ${line.opacity})`);
+        grad.addColorStop(1, 'rgba(255, 0, 51, 0)');
 
-        const bCanvas = document.getElementById('bridgeCanvas');
-        const bCtx = bCanvas.getContext('2d');
+        ctx.beginPath();
+        ctx.strokeStyle = grad;
+        ctx.lineWidth = Math.random() * 1.5 + 0.5;
+        ctx.moveTo(line.x, line.y);
+        ctx.lineTo(line.x + line.length, line.y);
+        ctx.stroke();
+      });
+      requestAnimationFrame(animateWind);
+    }
+    animateWind();
 
-        bCanvas.width = 1000;
-        bCanvas.height = 200;
+    // --- Voxel Bridge Rendering ---
+    function initBridgeCanvas() {
+      const bCanvas = document.getElementById('bridgeCanvas');
+      if (!bCanvas) return;
+      const bCtx = bCanvas.getContext('2d');
+      const BLOCK_SIZE = 18;
+      
+      bCtx.clearRect(0, 0, bCanvas.width, bCanvas.height);
 
-        const BLOCK_SIZE = 18;
-
-        function draw3DBlock(ctx, x, y, size, type = 'red') {
-            const h = size * 0.85;
-
-            let topColor, frontColor, sideColor, outlineColor;
-
-            if (type === 'red') {
-                topColor = '#ff3333';
-                frontColor = '#cc0000';
-                sideColor = '#770000';
-                outlineColor = '#ff8080';
-            } else if (type === 'dark') {
-                topColor = '#4a4a52';
-                frontColor = '#2b2b32';
-                sideColor = '#18181e';
-                outlineColor = '#686875';
-            } else if (type === 'gold') {
-                topColor = '#ffcc00';
-                frontColor = '#d99b00';
-                sideColor = '#805b00';
-                outlineColor = '#ffe680';
-            }
-
-            // Front face
-            ctx.fillStyle = frontColor;
-            ctx.fillRect(x, y + size * 0.3, size, h);
-
-            // Top face
-            ctx.fillStyle = topColor;
-            ctx.beginPath();
-            ctx.moveTo(x, y + size * 0.3);
-            ctx.lineTo(x + size * 0.35, y);
-            ctx.lineTo(x + size * 1.35, y);
-            ctx.lineTo(x + size, y + size * 0.3);
-            ctx.closePath();
-            ctx.fill();
-
-            // Right side face
-            ctx.fillStyle = sideColor;
-            ctx.beginPath();
-            ctx.moveTo(x + size, y + size * 0.3);
-            ctx.lineTo(x + size * 1.35, y);
-            ctx.lineTo(x + size * 1.35, y + h);
-            ctx.lineTo(x + size, y + size * 0.3 + h);
-            ctx.closePath();
-            ctx.fill();
-
-            // Highlight border
-            ctx.strokeStyle = outlineColor;
-            ctx.lineWidth = 1;
-            ctx.strokeRect(x, y + size * 0.3, size, h);
+      function drawBlock(x, y, color, shadow) {
+        bCtx.fillStyle = color;
+        bCtx.fillRect(x, y, BLOCK_SIZE - 2, BLOCK_SIZE - 2);
+        if (shadow) {
+          bCtx.fillStyle = shadow;
+          bCtx.fillRect(x + 2, y + BLOCK_SIZE - 4, BLOCK_SIZE - 4, 2);
         }
+      }
 
-        function drawBridge() {
-            bCtx.clearRect(0, 0, bCanvas.width, bCanvas.height);
+      for (let x = 40; x < 1160; x += BLOCK_SIZE) {
+        drawBlock(x, 220, '#FFFFFF', 'rgba(255, 255, 255, 0.4)');
+        drawBlock(x, 238, '#FF0033', '#99001F');
+      }
 
-            const startX = 30;
-            const deckY = 120;
-            const totalCols = 48;
-
-            // 1. Support Pillars
-            const pillarPositions = [5, 16, 27, 38, 46];
-            pillarPositions.forEach(pCol => {
-                const px = startX + pCol * BLOCK_SIZE;
-                for (let py = deckY + BLOCK_SIZE; py < deckY + (BLOCK_SIZE * 3.5); py += BLOCK_SIZE * 0.85) {
-                    draw3DBlock(bCtx, px, py, BLOCK_SIZE, 'dark');
-                }
-            });
-
-            // 2. Main Deck
-            for (let c = 0; c < totalCols; c++) {
-                const px = startX + c * BLOCK_SIZE;
-                draw3DBlock(bCtx, px, deckY, BLOCK_SIZE, 'red');
-            }
-
-            // 3. Guard Rails
-            for (let c = 0; c < totalCols; c++) {
-                if (c % 2 === 0) {
-                    const px = startX + c * BLOCK_SIZE;
-                    draw3DBlock(bCtx, px, deckY - BLOCK_SIZE * 0.85, BLOCK_SIZE * 0.8, 'gold');
-                }
-            }
-
-            // 4. Twin Towers
-            const towers = [11, 35];
-            towers.forEach(tCol => {
-                const tx = startX + tCol * BLOCK_SIZE;
-                for (let h = 1; h <= 6; h++) {
-                    draw3DBlock(bCtx, tx, deckY - (h * BLOCK_SIZE * 0.85), BLOCK_SIZE, 'red');
-                    draw3DBlock(bCtx, tx + BLOCK_SIZE, deckY - (h * BLOCK_SIZE * 0.85), BLOCK_SIZE, 'red');
-                }
-                draw3DBlock(bCtx, tx, deckY - (6.8 * BLOCK_SIZE * 0.85), BLOCK_SIZE, 'gold');
-                draw3DBlock(bCtx, tx + BLOCK_SIZE, deckY - (6.8 * BLOCK_SIZE * 0.85), BLOCK_SIZE, 'gold');
-            });
-
-            // 5. Suspension Cables
-            for (let c = 0; c < totalCols; c++) {
-                const px = startX + c * BLOCK_SIZE;
-                let cableY = deckY - (BLOCK_SIZE * 5) + Math.pow(c - 23, 2) * 0.17;
-                if (cableY < deckY - BLOCK_SIZE * 0.3) {
-                    draw3DBlock(bCtx, px, cableY, BLOCK_SIZE * 0.6, 'gold');
-                }
-            }
+      const towerX = [280, 880];
+      towerX.forEach(tx => {
+        for (let y = 60; y < 220; y += BLOCK_SIZE) {
+          drawBlock(tx, y, '#FF0033', '#99001F');
+          drawBlock(tx + BLOCK_SIZE, y, '#FF0033', '#99001F');
         }
+        drawBlock(tx - BLOCK_SIZE, 80, '#FF2A55');
+        drawBlock(tx + (BLOCK_SIZE * 2), 80, '#FF2A55');
+      });
 
-        window.onload = function () {
-            animateWind();
-            drawBridge();
-        };
-    </script>
+      for (let x = 300; x <= 860; x += BLOCK_SIZE * 2) {
+        const distFromCenter = Math.abs(x - 580);
+        const cableY = 100 + Math.pow(distFromCenter / 280, 2) * 110;
+        for (let y = cableY; y < 220; y += BLOCK_SIZE) {
+          drawBlock(x, y, 'rgba(255, 0, 51, 0.6)');
+        }
+      }
+    }
+  </script>
 </body>
 </html>
