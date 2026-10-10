@@ -179,6 +179,8 @@
         const hashBuffer = await crypto.subtle.digest('SHA-256', data);
         const hashArray = Array.from(new Uint8Array(hashBuffer));
         const hashedInput = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        console.log("Computed hash:", hashedInput);
+        console.log("Target hash:", TARGET_HASH);
         return hashedInput === TARGET_HASH;
       } catch (err) {
         console.error("Auth error:", err);
@@ -208,7 +210,10 @@
       const selectedMember = memberSelect.value;
       const isValid = await verifyPassword(passInput.value);
 
+      console.log("Login attempt - Member:", selectedMember, "Valid:", isValid);
+
       if (isValid && selectedMember) {
+        errorMsg.classList.add('hidden');
         activeUser = selectedMember;
         sessionStorage.setItem('tj_secure_auth', 'true');
         sessionStorage.setItem('tj_active_user', activeUser);
@@ -449,5 +454,32 @@
       if (!bCanvas) return;
       const bCtx = bCanvas.getContext('2d');
       const BLOCK_SIZE = 16;
-      
-      bCt
+      const blocks = 200;
+      let offset = 0;
+
+      function drawBridge() {
+        bCtx.fillStyle = '#030305';
+        bCtx.fillRect(0, 0, bCanvas.width, bCanvas.height);
+
+        for (let i = 0; i < blocks; i++) {
+          const x = ((i * BLOCK_SIZE) - offset) % (blocks * BLOCK_SIZE);
+          const y = bCanvas.height / 2 - BLOCK_SIZE / 2;
+          
+          const hue = (i * 2 + offset) % 360;
+          bCtx.fillStyle = `hsl(${hue}, 100%, 50%)`;
+          bCtx.fillRect(x, y, BLOCK_SIZE - 2, BLOCK_SIZE - 2);
+          
+          bCtx.strokeStyle = 'rgba(255, 0, 51, 0.3)';
+          bCtx.lineWidth = 1;
+          bCtx.strokeRect(x, y, BLOCK_SIZE - 2, BLOCK_SIZE - 2);
+        }
+
+        offset += 2;
+        requestAnimationFrame(drawBridge);
+      }
+
+      drawBridge();
+    }
+  </script>
+</body>
+</html>
