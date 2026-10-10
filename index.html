@@ -221,6 +221,124 @@
     // Load password on page load
     loadPasswordHash();
 
+    const GITHUB_STORAGE = {
+      owner: 'danishtesting4',
+      repo: 'Jembuatan',
+      branch: 'main',
+      path: 'shared-data.json',
+      tokenKey: 'tj_github_token'
+    };
+
+    function decodeBase64Content(content) {
+      const normalized = content.replace(/\n/g, '');
+      const binary = atob(normalized);
+      return decodeURIComponent(
+        Array.from(binary, char => '%' + ('00' + char.charCodeAt(0).toString(16)).slice(-2)).join('')
+      );
+    }
+
+    function getGitHubToken() {
+      const existing = sessionStorage.getItem(GITHUB_STORAGE.tokenKey);
+      if (existing) return existing;
+
+      const entered = prompt('Masukkan GitHub Personal Access Token (PAT) untuk menyimpan data absensi/chat di repo ini. Token hanya dipakai di browser ini dan tidak disimpan di repo.');
+      if (!entered || !entered.trim()) return null;
+
+      const token = entered.trim();
+      sessionStorage.setItem(GITHUB_STORAGE.tokenKey, token);
+      return token;
+    }
+
+    async function readGitHubState() {
+      const defaultState = {
+        attendance: { date: new Date().toISOString().split('T')[0], list: {} },
+        chat: []
+      };
+
+      try {
+        const response = await fetch(
+          `https://api.github.com/repos/${GITHUB_STORAGE.owner}/${GITHUB_STORAGE.repo}/contents/${GITHUB_STORAGE.path}?ref=${GITHUB_STORAGE.branch}`,
+          {
+            headers: {
+              'Accept': 'application/vnd.github+json',
+              'X-GitHub-Api-Version': '2022-11-28'
+            }
+          }
+        );
+
+        if (!response.ok) {
+          return defaultState;
+        }
+
+        const file = await response.json();
+        if (!file || !file.content) {
+          return defaultState;
+        }
+
+        const parsed = JSON.parse(decodeBase64Content(file.content));
+        return {
+          attendance: parsed.attendance || { date: new Date().toISOString().split('T')[0], list: {} },
+          chat: Array.isArray(parsed.chat) ? parsed.chat : []
+        };
+      } catch (error) {
+        console.warn('Gagal membaca state GitHub, memakai default:', error);
+        return defaultState;
+      }
+    }
+
+    async function writeGitHubState(state) {
+      const token = getGitHubToken();
+      if (!token) {
+        throw new Error('GitHub PAT belum diisi. Masukkan token untuk menyimpan data absensi dan chat.');
+      }
+
+      const fileUrl = `https://api.github.com/repos/${GITHUB_STORAGE.owner}/${GITHUB_STORAGE.repo}/contents/${GITHUB_STORAGE.path}?ref=${GITHUB_STORAGE.branch}`;
+      let sha = null;
+
+      try {
+        const existing = await fetch(fileUrl, {
+          headers: {
+            'Accept': 'application/vnd.github+json',
+            'X-GitHub-Api-Version': '2022-11-28',
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
+        if (existing.ok) {
+          const existingFile = await existing.json();
+          sha = existingFile.sha;
+        }
+      } catch (error) {
+        console.warn('Tidak bisa membaca file yang ada, mungkin file baru.', error);
+      }
+
+      const payload = JSON.stringify(state, null, 2);
+      const encoded = btoa(unescape(encodeURIComponent(payload)));
+
+      const response = await fetch(`https://api.github.com/repos/${GITHUB_STORAGE.owner}/${GITHUB_STORAGE.repo}/contents/${GITHUB_STORAGE.path}`, {
+        method: 'PUT',
+        headers: {
+          'Accept': 'application/vnd.github+json',
+          'X-GitHub-Api-Version': '2022-11-28',
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          message: `Update attendance and chat ${new Date().toISOString()}`,
+          branch: GITHUB_STORAGE.branch,
+          content: encoded,
+          ...(sha ? { sha } : {})
+        })
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(text || 'Write to GitHub failed');
+      }
+
+      return response.json();
+    }
+
     // --- UI & Auth Flow ---
     const authGate = document.getElementById('authGate');
     const mainContent = document.getElementById('mainContent');
@@ -274,7 +392,7 @@
     }
 
     // --- Shared Attendance System ---
-    function initClockSystem(username) {
+    async function initClockSystem(username) {
       const clockDisplay = document.getElementById('clockDisplay');
       const clockStatusBadge = document.getElementById('clockStatusBadge');
       const clockInfo = document.getElementById('clockInfo');
@@ -289,66 +407,100 @@
       }, 1000);
 
       const todayStr = new Date().toISOString().split('T')[0];
-      let records = JSON.parse(localStorage.getItem('tj_attendance_records') || '{}');
 
-      // Auto Clock-Out jika tanggal berubah
-      if (records.date && records.date !== todayStr) {
-        records = { date: todayStr, list: {} };
-        localStorage.setItem('tj_attendance_records', JSON.stringify(records));
-      } else if (!records.date) {
-        records = { date: todayStr, list: {} };
+      let records = { date: todayStr, list: {} };
+
+      function syncBoardFromRemote() {
+        return readGitHubState().then((state) => {
+          const remoteRecords = state.attendance || { date: todayStr, list: {} };
+          if (remoteRecords.date && remoteRecords.date !== todayStr) {
+            records = { date: todayStr, list: {} };
+          } else if (!remoteRecords.date) {
+            records = { date: todayStr, list: {} };
+          } else {
+            records = remoteRecords;
+          }
+
+          const me = records.list[username];
+          if (me && me.status === 'active') {
+            setClockedInState(me.time);
+          } else {
+            clockStatusBadge.textContent = 'BELUM ABSEN';
+            clockStatusBadge.className = 'text-xs font-mono px-2 py-0.5 rounded bg-yellow-500/10 text-yellow-400 border border-yellow-500/30';
+            clockInfo.textContent = 'Absen saat selesai kegiatan.';
+            btnClockIn.disabled = false;
+            btnClockIn.className = 'bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-3 rounded-xl text-xs transition shadow-[0_0_10px_rgba(16,185,129,0.3)]';
+            btnClockOut.disabled = true;
+            btnClockOut.className = 'bg-red-600/40 text-white font-bold py-2 px-3 rounded-xl text-xs transition border border-red-500/30 cursor-not-allowed';
+          }
+
+          updateAttendanceBoard(records.list);
+        }).catch((error) => {
+          console.warn('Tidak dapat sinkronisasi board:', error);
+        });
       }
 
-      let userRecord = records.list[username];
-      let isClockedIn = userRecord && userRecord.status === 'active';
+      await syncBoardFromRemote();
+      setInterval(() => {
+        syncBoardFromRemote();
+      }, 5000);
 
-      if (isClockedIn) {
-        setClockedInState(userRecord.time);
-      }
-
-      updateAttendanceBoard(records.list);
-
-      btnClockIn.addEventListener('click', () => {
-        const now = new Date();
-        const timeStr = now.toLocaleTimeString();
-
-        records.date = todayStr;
-        records.list[username] = { time: timeStr, status: 'active' };
-        localStorage.setItem('tj_attendance_records', JSON.stringify(records));
-
-        setClockedInState(timeStr);
-        updateAttendanceBoard(records.list);
+      btnClockIn.addEventListener('click', async () => {
+        try {
+          const state = await readGitHubState();
+          const existing = state.attendance || { date: todayStr, list: {} };
+          existing.date = todayStr;
+          existing.list[username] = { time: new Date().toLocaleTimeString(), status: 'active' };
+          state.attendance = existing;
+          await writeGitHubState(state);
+          records = existing;
+          setClockedInState(existing.list[username].time);
+          updateAttendanceBoard(records.list);
+        } catch (error) {
+          console.error('Clock-in failed:', error);
+          alert(error.message || 'Gagal menyimpan absen masuk ke GitHub.');
+        }
       });
 
-      btnClockOut.addEventListener('click', () => {
-        if (records.list[username]) {
-          records.list[username].status = 'completed';
-          localStorage.setItem('tj_attendance_records', JSON.stringify(records));
-        }
+      btnClockOut.addEventListener('click', async () => {
+        try {
+          const state = await readGitHubState();
+          const existing = state.attendance || { date: todayStr, list: {} };
+          existing.date = todayStr;
+          if (existing.list[username]) {
+            existing.list[username].status = 'completed';
+          }
+          state.attendance = existing;
+          await writeGitHubState(state);
+          records = existing;
 
-        clockStatusBadge.textContent = "SELESAI";
-        clockStatusBadge.className = "text-xs font-mono px-2 py-0.5 rounded bg-gray-500/10 text-gray-400 border border-gray-500/30";
-        clockInfo.textContent = "Sesi ditutup.";
-        
-        btnClockIn.disabled = false;
-        btnClockIn.className = "bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-3 rounded-xl text-xs transition shadow-[0_0_10px_rgba(16,185,129,0.3)] cursor-pointer";
-        
-        btnClockOut.disabled = true;
-        btnClockOut.className = "bg-red-600/40 text-white font-bold py-2 px-3 rounded-xl text-xs transition border border-red-500/30 cursor-not-allowed";
-        
-        updateAttendanceBoard(records.list);
+          clockStatusBadge.textContent = 'SELESAI';
+          clockStatusBadge.className = 'text-xs font-mono px-2 py-0.5 rounded bg-gray-500/10 text-gray-400 border border-gray-500/30';
+          clockInfo.textContent = 'Sesi ditutup.';
+          
+          btnClockIn.disabled = false;
+          btnClockIn.className = 'bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-3 rounded-xl text-xs transition shadow-[0_0_10px_rgba(16,185,129,0.3)]';
+          
+          btnClockOut.disabled = true;
+          btnClockOut.className = 'bg-red-600/40 text-white font-bold py-2 px-3 rounded-xl text-xs transition border border-red-500/30 cursor-not-allowed';
+
+          updateAttendanceBoard(records.list);
+        } catch (error) {
+          console.error('Clock-out failed:', error);
+          alert(error.message || 'Gagal menyimpan absen keluar ke GitHub.');
+        }
       });
 
       function setClockedInState(timeStr) {
-        clockStatusBadge.textContent = "AKTIF";
-        clockStatusBadge.className = "text-xs font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30";
+        clockStatusBadge.textContent = 'AKTIF';
+        clockStatusBadge.className = 'text-xs font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30';
         clockInfo.textContent = `Absen pukul ${timeStr}`;
         
         btnClockIn.disabled = true;
-        btnClockIn.className = "bg-emerald-600/40 text-white font-bold py-2 px-3 rounded-xl text-xs transition cursor-not-allowed";
+        btnClockIn.className = 'bg-emerald-600/40 text-white font-bold py-2 px-3 rounded-xl text-xs transition cursor-not-allowed';
         
         btnClockOut.disabled = false;
-        btnClockOut.className = "bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-3 rounded-xl text-xs transition shadow-[0_0_10px_rgba(255,0,51,0.3)] cursor-pointer";
+        btnClockOut.className = 'bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-3 rounded-xl text-xs transition shadow-[0_0_10px_rgba(255,0,51,0.3)] cursor-pointer';
       }
 
       function updateAttendanceBoard(list) {
@@ -365,7 +517,7 @@
         entries.forEach(([name, data]) => {
           count++;
           const item = document.createElement('div');
-          item.className = "flex justify-between items-center bg-black/40 border border-white/5 px-2.5 py-1.5 rounded-lg";
+          item.className = 'flex justify-between items-center bg-black/40 border border-white/5 px-2.5 py-1.5 rounded-lg';
           item.innerHTML = `
             <span class="text-white font-bold">${name}</span>
             <div class="flex items-center gap-2">
@@ -382,13 +534,14 @@
     }
 
     // --- Live Team Chat System ---
-    function initChatSystem(username) {
+    async function initChatSystem(username) {
       const chatMessages = document.getElementById('chatMessages');
       const chatForm = document.getElementById('chatForm');
       const chatInput = document.getElementById('chatInput');
 
-      function loadMessages() {
-        const msgs = JSON.parse(localStorage.getItem('tj_chat_messages') || '[]');
+      async function loadMessages() {
+        const state = await readGitHubState();
+        const msgs = Array.isArray(state.chat) ? state.chat : [];
         chatMessages.innerHTML = '';
 
         if (msgs.length === 0) {
@@ -411,31 +564,35 @@
         chatMessages.scrollTop = chatMessages.scrollHeight;
       }
 
-      chatForm.addEventListener('submit', (e) => {
+      chatForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const text = chatInput.value.trim();
         if (!text) return;
 
-        const now = new Date();
-        const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        try {
+          const state = await readGitHubState();
+          const msgs = Array.isArray(state.chat) ? state.chat : [];
+          const now = new Date();
+          const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-        const msgs = JSON.parse(localStorage.getItem('tj_chat_messages') || '[]');
-        msgs.push({ user: username, text: text, time: timeStr });
-        
-        if (msgs.length > 50) msgs.shift();
+          msgs.push({ user: username, text: text, time: timeStr });
+          if (msgs.length > 50) msgs.shift();
 
-        localStorage.setItem('tj_chat_messages', JSON.stringify(msgs));
-        chatInput.value = '';
-        loadMessages();
-      });
-
-      window.addEventListener('storage', (e) => {
-        if (e.key === 'tj_chat_messages' || e.key === 'tj_attendance_records') {
-          loadMessages();
+          state.chat = msgs;
+          await writeGitHubState(state);
+          chatInput.value = '';
+          await loadMessages();
+        } catch (error) {
+          console.error('Chat save failed:', error);
+          alert(error.message || 'Gagal menyimpan chat ke GitHub.');
         }
       });
 
-      loadMessages();
+      setInterval(() => {
+        loadMessages().catch((error) => console.warn('Gagal refresh chat:', error));
+      }, 5000);
+
+      await loadMessages();
     }
 
     // --- Wind Background Animation ---
